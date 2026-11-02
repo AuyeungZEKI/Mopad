@@ -58,7 +58,7 @@
 ## 安装
 
 1. 在 [Releases](../../releases) 下载 `Mopad-x.y.z.dmg`，打开后把 **Mopad** 拖进「应用程序」。
-2. 首次打开：由于未经 Apple 公证，需在 Finder 中 **右键 Mopad › 打开**，或在终端执行：
+2. 首次打开：需在 Finder 中 **右键 Mopad › 打开**，或在终端执行：
    ```bash
    xattr -dr com.apple.quarantine /Applications/Mopad.app
    ```
@@ -69,90 +69,6 @@
 ### 冲突提示
 - 开启「单指轻点以点按」时，建议关闭系统「智能缩放」（单指轻点两下），否则连按会同时触发缩放。设置页会给出一键关闭按钮。
 - 若双指缩放时误触切换全屏应用，可关闭「在全屏应用间轻扫」。
-
----
-
-## 从源码构建
-
-需要 Xcode 15+（或 Command Line Tools，含 Swift 5.10+）。无需 Xcode 工程文件。
-
-```bash
-git clone https://github.com/undwait/Mopad.git
-cd Mopad
-
-# 可选但推荐：创建本地签名证书，之后每次重新构建都不需要重新授权
-./Scripts/create-signing-cert.sh
-
-./Scripts/build.sh            # 构建到 build/Mopad.app
-./Scripts/build.sh install    # 构建并安装到 /Applications，然后启动
-./Scripts/make-dmg.sh         # 打包 release/Mopad-<版本>.dmg
-./Scripts/run-tests.sh        # 手势识别仿真测试（不会产生真实点击）
-```
-
-### 项目结构
-
-```
-Mopad/
-├── Sources/
-│   ├── App.swift             # 入口：菜单栏 + 设置窗口
-│   ├── AppState.swift        # 状态、权限检测、设置持久化、诊断
-│   ├── Views.swift           # iOS 风格设置界面与菜单
-│   ├── GestureEngine.swift   # 手势识别（轻点 / 三指轻触 / 三指捏合 / 双指缩放）
-│   ├── Multitouch.swift      # 读取妙控鼠标触点（MultitouchSupport）
-│   ├── Actions.swift         # 合成点按、右键、缩放、快捷键与打开应用
-│   ├── InputMonitor.swift    # 全局事件监听：识别物理点击、缩放时屏蔽滚动
-│   ├── MouseSettings.swift   # 读写系统鼠标设置
-│   └── Bridge.h              # 私有框架结构体与函数声明
-├── Resources/                # Info.plist、应用图标
-├── Scripts/                  # 构建、打包、证书、测试脚本
-├── Tests/GestureSimulation.swift
-└── docs/                     # README 图片
-```
-
-### 工作原理
-
-```
-妙控鼠标表面触点 ──► MultitouchSupport（私有框架，约 90 Hz）
-                          │
-                          ▼
-                   GestureEngine 逐帧识别
-                          │
-        ┌─────────────────┼──────────────────┐
-        ▼                 ▼                  ▼
-   CGEvent 点按/右键   合成 magnify 手势    NSWorkspace 打开应用
-                     或 ⌘+/⌘− 快捷键
-```
-
-- **读取触点**：运行时 `dlopen` 加载 `MultitouchSupport.framework`，按设备族（Magic Mouse 为 112/113）只监听鼠标，不影响触控板。
-- **系统设置**：通过 `IOHIDEventSystemClient` 写入 HID 参数即时生效，同时写入用户偏好以与系统设置保持一致。
-- **诊断**：运行状态写入 `~/Library/Application Support/Mopad/status.json`，便于排查权限问题。
-
-### 测试
-
-`./Scripts/run-tests.sh` 向识别引擎注入合成触点帧，覆盖 17 个场景：
-
-| 类别 | 应触发 | 应不触发 |
-|---|---|---|
-| 单指轻点 | 轻点、轻点两下、另一指搭着时轻点 | 按住 0.4 s、轻扫 3 mm、双指轻点 |
-| 三指轻触 | 三指轻触 | — |
-| 三指捏合 | 收拢 18%、先张后捏、中途丢指、拇指 + 三指 | 只收拢 8%、整体平移、静置抖动 |
-| 双指缩放 | 张开、捏合 | 同向滚动 |
-
----
-
-## 已知限制
-
-- 使用了 Apple 私有框架，**无法上架 Mac App Store**；macOS 大版本更新后可能需要适配。
-- 发布包为自签名，未经 Apple 公证，首次打开需手动放行（见「安装」）。
-- 「原生捏合」通过合成触控板手势事件实现，个别应用可能不响应，可切换为「⌘+ / ⌘−」模式。
-- 当前仅在 Apple Silicon、macOS 26 与 USB-C 版妙控鼠标上测试；手势阈值仍在真机调校中。
-
-## 路线图
-
-- [ ] 双指左右轻扫 = 前进 / 后退
-- [ ] 手势自定义映射
-- [ ] Universal Binary（Intel 支持）
-- [ ] Developer ID 签名与公证
 
 ## 致谢
 
